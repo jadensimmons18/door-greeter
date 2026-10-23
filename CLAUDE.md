@@ -13,11 +13,11 @@ The owner is a computer science student with **no prior computer vision experien
 ## Current status
 
 - Coding has **not started**.
-- The first milestone is a **prototype running on a laptop, using an iPhone as the camera** (not the laptop's built-in webcam). Dedicated hardware comes later.
+- The first milestone is a **prototype running on a Mac mini, using an iPhone as the camera** (the Mac mini has no camera of its own). Dedicated hardware comes later.
 
 ## Scope and phases
 
-**Phase 1 (current target): laptop prototype with an iPhone camera**
+**Phase 1 (current target): Mac mini prototype with an iPhone camera**
 - Read frames from the iPhone camera.
 - Detect faces in each frame.
 - Recognize known people and print or display their names.
@@ -26,7 +26,7 @@ The owner is a computer science student with **no prior computer vision experien
 - Detecting entry vs. leaving
 - Storing and managing known people (enrollment)
 - Spoken or on-screen greeting logic
-- Moving from the laptop to dedicated hardware at a real door
+- Moving from the Mac mini to dedicated hardware at a real door
 
 The order and details of the later phases are open and will be decided as the project progresses.
 
@@ -34,9 +34,9 @@ The order and details of the later phases are open and will be decided as the pr
 
 | Topic | Status |
 |---|---|
-| First target | Prototype on a laptop (decided) |
-| Camera | **iPhone** instead of the laptop webcam (decided) |
-| How the iPhone feeds video to the laptop | **Undecided** (e.g. Continuity Camera, a camera-streaming app, or another method). Not yet chosen. |
+| First target | Prototype on a Mac mini (desktop, no built-in camera) (decided) |
+| Camera | **iPhone** (decided) |
+| How the iPhone feeds video to the Mac | **Continuity Camera** (decided). Chosen for low setup and good image quality; a Wi-Fi streaming app was the alternative, if the phone ever needs to sit away from the Mac. |
 | Face detection/recognition stack | **Undecided.** OpenCV (YuNet detector + SFace recognizer) is being used to get started; InsightFace is a possible alternative. Revisit once the pipeline works. |
 | Entry vs. leaving logic | **Undecided.** Options discussed: an inward-facing camera so only approaching faces are detected, or tracking people across frames and detecting the direction they cross a line. |
 | Final hardware | **Undecided** |
@@ -61,8 +61,9 @@ frame → detect faces → turn each face into an embedding → compare to known
 - Language: Python
 - Uses a per-project virtual environment (`python -m venv .venv`), activated before installing packages.
 - Packages so far: `opencv-python`, `numpy`
-- Files created so far (in the walkthrough, not yet confirmed to exist in the repo): `cam_test.py` (camera check) and `detect.py` (face detection with YuNet)
-- Note: those scripts were written for a laptop webcam (`cv2.VideoCapture(0)`). Since the camera is an iPhone, the video source line will need to change depending on how the iPhone is connected.
+- Files so far: `cam_test.py` (live camera view), `find_cameras.py` (tries camera numbers to find which one is the iPhone) and `detect.py` (live face detection with YuNet; needs the model file in `models/`).
+- With Continuity Camera, the iPhone shows up as an ordinary camera number in `cv2.VideoCapture(n)`. The Mac mini has no other camera, so it is normally `0`, but the number isn't guaranteed.
+- If the iPhone doesn't appear as a camera: first check FaceTime/Photo Booth's Video menu (if it's missing there, macOS hasn't connected to it, so OpenCV can't either). A **USB cable** most likely fixed it the first time; Wi-Fi and Bluetooth on both devices, same Apple ID and Handoff on are the other requirements.
 
 ## How Claude should work on this project
 
@@ -77,7 +78,6 @@ The owner wants to learn, not just receive code.
 
 ## Open questions to resolve with the owner
 
-- How to connect the iPhone camera to the laptop
 - Which CV stack to commit to
 - How to handle entry vs. leaving
 - Target hardware
