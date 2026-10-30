@@ -12,7 +12,7 @@ The owner is a computer science student with **no prior computer vision experien
 
 ## Current status
 
-- Coding has **not started**.
+- Live face **detection** works (`detect.py`). Face **recognition** is next.
 - The first milestone is a **prototype running on a Mac mini, using an iPhone as the camera** (the Mac mini has no camera of its own). Dedicated hardware comes later.
 
 ## Scope and phases
@@ -39,6 +39,9 @@ The order and details of the later phases are open and will be decided as the pr
 | How the iPhone feeds video to the Mac | **Continuity Camera** (decided). Chosen for low setup and good image quality; a Wi-Fi streaming app was the alternative, if the phone ever needs to sit away from the Mac. |
 | Face detection/recognition stack | **Undecided.** OpenCV (YuNet detector + SFace recognizer) is being used to get started; InsightFace is a possible alternative. Revisit once the pipeline works. |
 | Entry vs. leaving logic | **Undecided.** Options discussed: an inward-facing camera so only approaching faces are detected, or tracking people across frames and detecting the direction they cross a line. |
+| Where recognition happens | **A face-level camera at the entry (doorbell-style)** (decided). Ceiling-corner cameras see faces from too high and too small to recognize reliably. |
+| Room cameras | **Later phase** (decided). The long-term vision is a home security/automation system with cameras in the top corners of rooms; those would detect and track people (possibly using person re-identification), not recognize faces. |
+| 2D vs. depth/infrared sensing | **2D (normal camera) for the prototype** (decided). Depth (e.g. Intel RealSense, OAK-D) could add anti-spoofing, and infrared could add low-light recognition; revisit both when choosing final hardware, especially if the system will unlock doors or handle security. |
 | Final hardware | **Undecided** |
 | Greeting output (speech engine, on-screen, etc.) | **Undecided** |
 | Where data is stored (names, embeddings) | **Undecided** |
@@ -61,7 +64,7 @@ frame → detect faces → turn each face into an embedding → compare to known
 - Language: Python
 - Uses a per-project virtual environment (`python -m venv .venv`), activated before installing packages.
 - Packages so far: `opencv-python`, `numpy`
-- Files so far: `cam_test.py` (live camera view), `find_cameras.py` (tries camera numbers to find which one is the iPhone) and `detect.py` (live face detection with YuNet; needs the model file in `models/`).
+- Files so far: `cam_test.py` (live camera view) and `detect.py` (live face detection with YuNet; needs `models/face_detection_yunet_2023mar.onnx`, downloaded from the `opencv/opencv_zoo` repo). The score threshold had to be lowered from the default 0.9, because faces scored only about 0.90.
 - With Continuity Camera, the iPhone shows up as an ordinary camera number in `cv2.VideoCapture(n)`. The Mac mini has no other camera, so it is normally `0`, but the number isn't guaranteed.
 - If the iPhone doesn't appear as a camera: first check FaceTime/Photo Booth's Video menu (if it's missing there, macOS hasn't connected to it, so OpenCV can't either). A **USB cable** most likely fixed it the first time; Wi-Fi and Bluetooth on both devices, same Apple ID and Handoff on are the other requirements.
 
