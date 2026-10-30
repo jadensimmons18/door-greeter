@@ -44,7 +44,7 @@ The order and details of the later phases are open and will be decided as the pr
 | 2D vs. depth/infrared sensing | **2D (normal camera) for the prototype** (decided). Depth (e.g. Intel RealSense, OAK-D) could add anti-spoofing, and infrared could add low-light recognition; revisit both when choosing final hardware, especially if the system will unlock doors or handle security. |
 | Final hardware | **Undecided** |
 | Greeting output (speech engine, on-screen, etc.) | **Undecided** |
-| Where data is stored (names, embeddings) | **Undecided** |
+| Where data is stored (names, embeddings) | **SQLite** (decided), loaded into a NumPy array in memory for comparisons. The database file should stay on the local machine and out of git. |
 | Privacy and consent approach | **Undecided** |
 
 Do not treat any "Undecided" item as settled. Ask the owner before choosing for them.
@@ -85,4 +85,4 @@ The owner wants to learn, not just receive code.
 - How to handle entry vs. leaving
 - Target hardware
 - How greetings are delivered
-- Where and how data is stored, and the privacy/consent approach for storing people's biometric data
+- The privacy/consent approach for storing people's biometric data
