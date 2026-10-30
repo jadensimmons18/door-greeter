@@ -6,6 +6,9 @@ detector = cv2.FaceDetectorYN.create("./models/face_detection_yunet_2023mar.onnx
 recognizer = cv2.FaceRecognizerSF.create("./models/face_recognition_sface_2021dec.onnx", "")
 
 saved = None
+name = None
+
+threshold = 0.50
 
 while True:
     ok, frame = cap.read() # Wait until the camera has a new frame ready
@@ -30,12 +33,13 @@ while True:
 
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
-            # NEW: draw the 5 landmarks as red dots.
-            # face[4:14] is 10 numbers: x, y, x, y, ... (one pair per landmark),
-            # so reshape(5, 2) turns it into 5 rows of (x, y).
-            landmarks = face[4:14].reshape(5, 2).astype(int)
-            for (x, y) in landmarks:
-                cv2.circle(frame, (x, y), 4, (0, 0, 255), -1)
+            if saved is not None:
+                score = recognizer.match(embedding, saved, cv2.FaceRecognizerSF_FR_COSINE)
+
+                if score > threshold:
+                    cv2.putText(frame, name, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                else:
+                    cv2.putText(frame, "unknown", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 
 
     cv2.imshow("cam", frame)
@@ -46,6 +50,7 @@ while True:
 
     if key == ord("s") and embedding is not None:
         saved = embedding
+        name = "jaden"
         print("Saved!!")
 
 
