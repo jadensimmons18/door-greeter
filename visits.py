@@ -8,6 +8,15 @@ VISIT_TIMEOUT = 15.0  # seconds without any face before a visit closes
 MIN_FRAMES = 3        # frames a name (or a face count) must appear in to be trusted
 WAITING_TIME = 5.0    # seconds of visit before it counts as someone waiting (shorter = passing by)
 NOTIFY_TIME = 11.0    # seconds of visit before deciding whether to send "unknown people at your door"
+UPDATE_FRAMES = 5     # frames a higher unknown count must appear in before an update notification
+
+
+# The largest k such that at least min_frames of the values are k or more.
+# That's the min_frames-th largest value: sorted [3, 3, 2, 2, 1] with min_frames=3 -> 2.
+def kth_largest(values, min_frames):
+    if len(values) < min_frames:
+        return 0  # too few frames to trust anything (e.g. a one-frame false detection)
+    return sorted(values, reverse=True)[min_frames - 1]
 
 
 class Visits:
@@ -15,6 +24,7 @@ class Visits:
         self.start = None           # when the current visit opened (time.monotonic()), or None if no visit is open
         self.last_face_time = None  # when a face was last detected during the current visit
         self.face_counts = []       # number of faces in each frame of the current visit (frames with faces only)
+        self.unknown_labels = []    # number of faces labeled "unknown" in each of those frames
         self.name_frames = Counter()  # name -> number of frames it was recognized in, during the current visit
         # Flags so each milestone fires once per visit, not on every frame after it's reached
         self.waiting_reported = False  # the 5 s mark has been handled
@@ -32,6 +42,7 @@ class Visits:
             if not self.is_open():
                 self.start = now
                 self.face_counts = []  # a new visit starts with no data from the last one
+                self.unknown_labels = []
                 self.name_frames = Counter()
                 self.waiting_reported = False
                 self.door_decided = False
@@ -40,6 +51,7 @@ class Visits:
             self.last_face_time = now
 
             self.face_counts.append(len(names))
+            self.unknown_labels.append(names.count("unknown"))
             # set(): count each name at most once per frame, so two faces both matching "jaden" in one
             # frame (one is a misrecognition) don't count as two frames of evidence.
             # Unknowns are left out here; they're worked out from the face count instead.
@@ -73,21 +85,34 @@ class Visits:
             unknowns = self.unknown_count()
             if unknowns >= 1:
                 self.reported_unknowns = unknowns
-                if unknowns == 1:
-                    print("[notify] 1 unknown person is at your door")
-                else:
-                    print(f"[notify] {unknowns} unknown people are at your door")
+                self.notify_unknowns(unknowns)
+            return  # the update check below needs at least one more frame after this
+
+        # After a notification was sent: one update each time the unknown count goes up.
+        # Not when a household member was there at 11 s (reported_unknowns stays 0), and not on drops.
+        if self.reported_unknowns > 0:
+            # Counts faces actually labeled "unknown", needing UPDATE_FRAMES frames of evidence.
+            # (Face count minus known names doesn't work here: a known person who walks up adds a
+            # face on every frame, but only subtracts once recognized MIN_FRAMES times, so they'd
+            # briefly look like a new unknown. With labels, only frames where they go unrecognized count.)
+            unknowns = kth_largest(self.unknown_labels, UPDATE_FRAMES)
+            if unknowns > self.reported_unknowns:
+                self.reported_unknowns = unknowns
+                self.notify_unknowns(unknowns)
+
+    def notify_unknowns(self, unknowns):
+        if unknowns == 1:
+            print("[notify] 1 unknown person is at your door")
+        else:
+            print(f"[notify] {unknowns} unknown people are at your door")
 
     # Names recognized in at least MIN_FRAMES frames of this visit
     def known_names(self):
         return [name for name, frames in self.name_frames.items() if frames >= MIN_FRAMES]
 
-    # The largest k such that at least MIN_FRAMES frames had k or more faces.
-    # That's the MIN_FRAMES-th largest face count: sorted [3, 3, 2, 2, 1] -> 3rd value is 2.
+    # The largest k such that at least MIN_FRAMES frames had k or more faces
     def people_count(self):
-        if len(self.face_counts) < MIN_FRAMES:
-            return 0  # too few frames to trust anything (e.g. a one-frame false detection)
-        return sorted(self.face_counts, reverse=True)[MIN_FRAMES - 1]
+        return kth_largest(self.face_counts, MIN_FRAMES)
 
     # People who were there but not recognized. max(0, ...) in case a misrecognized name
     # got past the frame rule and there are more names than people.

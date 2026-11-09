@@ -74,7 +74,7 @@ Instead of tracking each person from frame to frame, the doorbell summarizes the
 - **Under 5 s:** a passer-by. Ignored.
 - **5 s:** the visit counts as "someone waiting" (the hook for logging and clips later). Measured as how long the visit has lasted, not as a face in every frame.
 - **11 s:** if **no known person** counts in the visit and the unknown count is 1 or more, notify `X unknown people are at your door`. If a known person is there, send nothing.
-- **After the 11 s notification:** a known person showing up sends nothing. If the **unknown count** (after subtracting names that count) goes **above the last reported number for at least 5 frames**, send one updated notification with the new count. Subtracting names first stops a known person from briefly counting as "unknown" before they're recognized 3 times.
+- **After the 11 s notification:** a known person showing up sends nothing. If the number of faces **labeled "unknown"** goes **above the last reported number in at least 5 frames**, send one updated notification with the new count. Only when the 11 s notification was actually sent, and never on drops. (Labels are used here instead of "face count − known names": a known person walking up adds a face to every frame but is only subtracted once recognized 3 times, so the subtraction version briefly reported them as a new unknown. With labels, a known person only causes a false update if they go unrecognized in 5+ frames.)
 
 **Arrived / left (needs the mmWave sensor)**
 - People go inside after a visit → "jaden arrived home", or "jaden and 1 unknown arrived home". Nothing for an all-unknown group by default.
