@@ -4,7 +4,6 @@ import os
 import threading
 import time
 from dotenv import load_dotenv
-from tracker import Tracker
 
 load_dotenv()
 
@@ -24,8 +23,6 @@ threshold = 0.50
 DETECT_WIDTH = 960  # faces are detected on a copy shrunk to this width (smaller = faster, but distant faces get missed)
 
 database = db.load_faces()
-
-tracker = Tracker()
 
 # Shared between the reader thread and the main loop
 latest_frame = None              # the newest frame from the camera, or None if it's already been taken
@@ -80,11 +77,6 @@ def main():
             # Convert the box and landmarks (columns 0-13) back to full-size pixels; column 14 is the score
             faces[:, :14] /= scale
 
-        # Match this frame's faces to the faces seen before. Runs even with no faces, so old tracks get closed
-        boxes = [] if faces is None else [face[0:4] for face in faces]
-        track_ids = tracker.update(boxes, time.monotonic())
-
-        if faces is not None:
             for i, face in enumerate(faces):
                 # x1, y1 are the coordinates of the top left corner of the box around the face
                 # w, h = width, height respectively
@@ -102,8 +94,8 @@ def main():
 
                 name = find_match(embedding)
 
-                # "0: jaden #3" = face number 0 (for saving with s), recognized as jaden, track ID 3
-                cv2.putText(frame, f"{i}: {name} #{track_ids[i]}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+                # "0: jaden" = face number 0 (for saving with s), recognized as jaden
+                cv2.putText(frame, f"{i}: {name}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 
 
         cv2.imshow("cam", frame)
