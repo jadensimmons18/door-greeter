@@ -1,6 +1,14 @@
 import cv2
+import os
+from dotenv import load_dotenv
 
-cap = cv2.VideoCapture(0)  # 0 = default camera
+load_dotenv()
+
+USERNAME = os.getenv("RTSP_USERNAME")
+PASSWORD = os.getenv("RTSP_PASSWORD")
+IP = os.getenv("RTSP_IP")
+
+cap = cv2.VideoCapture(f"rtsp://{USERNAME}:{PASSWORD}@{IP}:554/stream1")
 
 while True:
     ok, frame = cap.read()

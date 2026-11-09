@@ -1,9 +1,18 @@
 import cv2
 import db
+import os
+import threading
+import time
+from dotenv import load_dotenv
 
-cap = cv2.VideoCapture(0)  # 0 = default camera
+load_dotenv()
 
-# (1920,1080) is only a starting size; main() resets it to each frame's real size
+USERNAME = os.getenv("RTSP_USERNAME")
+PASSWORD = os.getenv("RTSP_PASSWORD")
+IP = os.getenv("RTSP_IP")
+
+cap = cv2.VideoCapture(f"rtsp://{USERNAME}:{PASSWORD}@{IP}:554/stream1")
+
 detector = cv2.FaceDetectorYN.create("./models/face_detection_yunet_2023mar.onnx", "", (1920,1080), 0.7)
 recognizer = cv2.FaceRecognizerSF.create("./models/face_recognition_sface_2021dec.onnx", "")
 
@@ -13,11 +22,42 @@ threshold = 0.50
 
 database = db.load_faces()
 
-def main():
-    while True:
-        ok, frame = cap.read() # Wait until the camera has a new frame ready
+# Shared between the reader thread and the main loop
+latest_frame = None              # the newest frame from the camera, or None if it's already been taken
+frame_lock = threading.Lock()    # only one thread may touch latest_frame at a time
+stop_reading = threading.Event() # set by the main loop to tell the reader thread to stop
+
+# Runs in a background thread: keeps reading the stream and keeps only the newest frame,
+# so the main loop never works through a backlog of old frames
+def read_frames():
+    global latest_frame
+    while not stop_reading.is_set():
+        ok, frame = cap.read()
         if not ok:
-            break
+            break  # stream ended or dropped
+        with frame_lock:
+            latest_frame = frame  # overwrite: any frame the main loop hasn't taken yet is dropped
+
+# Returns the newest frame and marks it as taken, or None if no new frame has arrived yet
+def take_latest_frame():
+    global latest_frame
+    with frame_lock:
+        frame = latest_frame
+        latest_frame = None
+    return frame
+
+def main():
+    reader = threading.Thread(target=read_frames, daemon=True)
+    reader.start()
+
+    while True:
+        frame = take_latest_frame()
+        if frame is None:
+            if not reader.is_alive():
+                print("Camera stream ended")
+                break
+            time.sleep(0.005)  # no new frame yet; wait briefly instead of spinning the CPU
+            continue
 
         # Tell the detector the real frame size, so it works with any camera
         frame_h, frame_w = frame.shape[:2]
