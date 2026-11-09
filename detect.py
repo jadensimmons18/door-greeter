@@ -20,6 +20,8 @@ db.init_db()
 
 threshold = 0.50
 
+DETECT_WIDTH = 960  # faces are detected on a copy shrunk to this width (smaller = faster, but distant faces get missed)
+
 database = db.load_faces()
 
 # Shared between the reader thread and the main loop
@@ -59,14 +61,22 @@ def main():
             time.sleep(0.005)  # no new frame yet; wait briefly instead of spinning the CPU
             continue
 
-        # Tell the detector the real frame size, so it works with any camera
+        # Detect on a smaller copy for speed; recognize on the full-size frame for detail
         frame_h, frame_w = frame.shape[:2]
-        detector.setInputSize((frame_w, frame_h))
+        scale = min(1.0, DETECT_WIDTH / frame_w)  # never enlarge a frame that's already small
+        small = cv2.resize(frame, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+
+        # Tell the detector the small copy's size, so it works with any camera
+        small_h, small_w = small.shape[:2]
+        detector.setInputSize((small_w, small_h))
 
         embeddings = []  # one embedding per face in this frame, in the same order as the numbers on screen
-        _, faces = detector.detect(frame)
+        _, faces = detector.detect(small)
 
         if faces is not None:
+            # Convert the box and landmarks (columns 0-13) back to full-size pixels; column 14 is the score
+            faces[:, :14] /= scale
+
             for i, face in enumerate(faces):
                 # x1, y1 are the coordinates of the top left corner of the box around the face
                 # w, h = width, height respectively
