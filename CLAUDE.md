@@ -120,7 +120,7 @@ frame → detect faces → turn each face into an embedding → compare to known
 - Packages so far: `opencv-python`, `numpy`, `python-dotenv`
 - Files so far:
   - `cam_test.py`: live camera view.
-  - `detect.py`: live face detection (YuNet) and recognition (SFace) on the RTSP stream, with a background reader thread. Needs `models/face_detection_yunet_2023mar.onnx` and `models/face_recognition_sface_2021dec.onnx`, both from the `opencv/opencv_zoo` repo. Uses cosine similarity with a threshold of 0.50; OpenCV suggests about 0.363 for SFace. The detector's score threshold is 0.7 (lowered from the default 0.9, because faces scored only about 0.90).
+  - `detect.py`: live face detection (YuNet) and recognition (SFace) on the RTSP stream, with a background reader thread. Needs `models/face_detection_yunet_2023mar.onnx` and `models/face_recognition_sface_2021dec.onnx`, both from the `opencv/opencv_zoo` repo. Uses cosine similarity with a threshold of 0.50; OpenCV suggests about 0.363 for SFace. The detector's score threshold is 0.8 (the default 0.9 missed real faces, which scored only about 0.90; 0.7 let a hand over a face produce a second false box).
   - `db.py`: SQLite storage. A `faces` table with `id`, `name` and `embedding BLOB`. Embeddings are stored with `.tobytes()` and loaded with `np.frombuffer(..., dtype=np.float32).reshape(1, 128)`.
   - `tracker.py`: an IoU + face-embedding tracker. Not used now; kept in case tracking comes back.
   - `.env` (gitignored): `RTSP_USERNAME`, `RTSP_PASSWORD`, `RTSP_IP` for the Tapo camera's "Camera Account".

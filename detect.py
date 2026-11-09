@@ -4,6 +4,7 @@ import os
 import threading
 import time
 from dotenv import load_dotenv
+from visits import Visits
 
 load_dotenv()
 
@@ -13,7 +14,7 @@ IP = os.getenv("RTSP_IP")
 
 cap = cv2.VideoCapture(f"rtsp://{USERNAME}:{PASSWORD}@{IP}:554/stream1")
 
-detector = cv2.FaceDetectorYN.create("./models/face_detection_yunet_2023mar.onnx", "", (1920,1080), 0.7)
+detector = cv2.FaceDetectorYN.create("./models/face_detection_yunet_2023mar.onnx", "", (1920,1080), 0.8)
 recognizer = cv2.FaceRecognizerSF.create("./models/face_recognition_sface_2021dec.onnx", "")
 
 db.init_db()
@@ -23,6 +24,8 @@ threshold = 0.50
 DETECT_WIDTH = 960  # faces are detected on a copy shrunk to this width (smaller = faster, but distant faces get missed)
 
 database = db.load_faces()
+
+visits = Visits()
 
 # Shared between the reader thread and the main loop
 latest_frame = None              # the newest frame from the camera, or None if it's already been taken
@@ -71,6 +74,7 @@ def main():
         detector.setInputSize((small_w, small_h))
 
         embeddings = []  # one embedding per face in this frame, in the same order as the numbers on screen
+        names = []       # the name each face matched ("unknown" if none), same order
         _, faces = detector.detect(small)
 
         if faces is not None:
@@ -93,9 +97,13 @@ def main():
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
                 name = find_match(embedding)
+                names.append(name)
 
                 # "0: jaden" = face number 0 (for saving with s), recognized as jaden
                 cv2.putText(frame, f"{i}: {name}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+
+        # Feed every frame to the visit logic, even with no faces (empty list), so visits can close
+        visits.update(names, time.monotonic())
 
 
         cv2.imshow("cam", frame)
