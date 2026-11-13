@@ -1,32 +1,86 @@
 import cv2
 import db
+import os
+import threading
+import time
+from dotenv import load_dotenv
+from visits import Visits
 
-cap = cv2.VideoCapture(0)  # 0 = default camera
+load_dotenv()
 
-# (1920,1080) is only a starting size; main() resets it to each frame's real size
-detector = cv2.FaceDetectorYN.create("./models/face_detection_yunet_2023mar.onnx", "", (1920,1080), 0.7)
+USERNAME = os.getenv("RTSP_USERNAME")
+PASSWORD = os.getenv("RTSP_PASSWORD")
+IP = os.getenv("RTSP_IP")
+
+cap = cv2.VideoCapture(f"rtsp://{USERNAME}:{PASSWORD}@{IP}:554/stream1")
+
+detector = cv2.FaceDetectorYN.create("./models/face_detection_yunet_2023mar.onnx", "", (1920,1080), 0.8)
 recognizer = cv2.FaceRecognizerSF.create("./models/face_recognition_sface_2021dec.onnx", "")
 
 db.init_db()
 
 threshold = 0.50
 
+DETECT_WIDTH = 960  # faces are detected on a copy shrunk to this width (smaller = faster, but distant faces get missed)
+
 database = db.load_faces()
 
-def main():
-    while True:
-        ok, frame = cap.read() # Wait until the camera has a new frame ready
-        if not ok:
-            break
+visits = Visits()
 
-        # Tell the detector the real frame size, so it works with any camera
+# Shared between the reader thread and the main loop
+latest_frame = None              # the newest frame from the camera, or None if it's already been taken
+frame_lock = threading.Lock()    # only one thread may touch latest_frame at a time
+stop_reading = threading.Event() # set by the main loop to tell the reader thread to stop
+
+# Runs in a background thread: keeps reading the stream and keeps only the newest frame,
+# so the main loop never works through a backlog of old frames
+def read_frames():
+    global latest_frame
+    while not stop_reading.is_set():
+        ok, frame = cap.read()
+        if not ok:
+            break  # stream ended or dropped
+        with frame_lock:
+            latest_frame = frame  # overwrite: any frame the main loop hasn't taken yet is dropped
+
+# Returns the newest frame and marks it as taken, or None if no new frame has arrived yet
+def take_latest_frame():
+    global latest_frame
+    with frame_lock:
+        frame = latest_frame
+        latest_frame = None
+    return frame
+
+def main():
+    reader = threading.Thread(target=read_frames, daemon=True)
+    reader.start()
+
+    while True:
+        frame = take_latest_frame()
+        if frame is None:
+            if not reader.is_alive():
+                print("Camera stream ended")
+                break
+            time.sleep(0.005)  # no new frame yet; wait briefly instead of spinning the CPU
+            continue
+
+        # Detect on a smaller copy for speed; recognize on the full-size frame for detail
         frame_h, frame_w = frame.shape[:2]
-        detector.setInputSize((frame_w, frame_h))
+        scale = min(1.0, DETECT_WIDTH / frame_w)  # never enlarge a frame that's already small
+        small = cv2.resize(frame, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+
+        # Tell the detector the small copy's size, so it works with any camera
+        small_h, small_w = small.shape[:2]
+        detector.setInputSize((small_w, small_h))
 
         embeddings = []  # one embedding per face in this frame, in the same order as the numbers on screen
-        _, faces = detector.detect(frame)
+        names = []       # the name each face matched ("unknown" if none), same order
+        _, faces = detector.detect(small)
 
         if faces is not None:
+            # Convert the box and landmarks (columns 0-13) back to full-size pixels; column 14 is the score
+            faces[:, :14] /= scale
+
             for i, face in enumerate(faces):
                 # x1, y1 are the coordinates of the top left corner of the box around the face
                 # w, h = width, height respectively
@@ -43,8 +97,13 @@ def main():
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
                 name = find_match(embedding)
+                names.append(name)
 
+                # "0: jaden" = face number 0 (for saving with s), recognized as jaden
                 cv2.putText(frame, f"{i}: {name}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
+
+        # Feed every frame to the visit logic, even with no faces (empty list), so visits can close
+        visits.update(names, time.monotonic())
 
 
         cv2.imshow("cam", frame)
